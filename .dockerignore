@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env
+*.env.local
+.vscode/
+.idea/
+*.md
+*.log
+.worktrees/
+tests/

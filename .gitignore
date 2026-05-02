@@ -1,0 +1,34 @@
+# Binários
+/snip
+/api
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Testes
+*.test
+*.out
+
+# Go build cache
+/vendor/
+
+# Ambiente
+.env
+*.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker
+.worktrees/
+
+# Logs
+*.log
+*.Identifier
