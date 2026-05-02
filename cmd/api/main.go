@@ -21,7 +21,10 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	"github.com/devpedrois/snip/internal/config"
+	"github.com/devpedrois/snip/internal/handler"
+	"github.com/devpedrois/snip/internal/middleware"
 	mysqlrepo "github.com/devpedrois/snip/internal/repository/mysql"
+	"github.com/devpedrois/snip/internal/service"
 )
 
 func main() {
@@ -58,11 +61,18 @@ func run() error {
 	}
 	defer db.Close()
 
+	urlRepo := mysqlrepo.NewURLRepository(db)
+	shortenerSvc := service.NewShortenerService(urlRepo, cfg.BaseURL, cfg.URLExpirationDays)
+	shortenHandler := handler.NewShortenHandler(shortenerSvc, cfg.BaseURL)
+
 	r := chi.NewRouter()
-	r.Use(chimiddleware.RequestID)
+	r.Use(middleware.RequestID)
 	r.Use(chimiddleware.RealIP)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Logger(logger))
 
 	r.Get("/health", healthHandler)
+	r.Post("/api/shorten", shortenHandler.Handle)
 
 	srv := &http.Server{
 		Addr:         net.JoinHostPort("", cfg.AppPort),
