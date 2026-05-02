@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 
@@ -16,11 +16,14 @@ FROM alpine:3.19
 
 RUN apk add --no-cache ca-certificates tzdata
 
-COPY --from=builder /snip /snip
+WORKDIR /app
+
+COPY --from=builder /snip .
+COPY --from=builder /build/migrations ./migrations
 
 RUN adduser -D -g '' appuser
 USER appuser
 
 EXPOSE 8080
 
-CMD ["/snip"]
+CMD ["/app/snip"]
