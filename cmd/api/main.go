@@ -20,8 +20,8 @@ import (
 	migmysql "github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"github.com/devpedrois/Snip/internal/config"
-	mysqlrepo "github.com/devpedrois/Snip/internal/repository/mysql"
+	"github.com/devpedrois/snip/internal/config"
+	mysqlrepo "github.com/devpedrois/snip/internal/repository/mysql"
 )
 
 func main() {
@@ -46,17 +46,17 @@ func run() error {
 		return err
 	}
 
+	if err := runMigrations(cfg.MigrationDSN(), logger); err != nil {
+		logger.Error("failed to run migrations", "err", err)
+		return err
+	}
+
 	db, err := mysqlrepo.NewMySQLDB(context.Background(), cfg.DSN(), cfg.MySQLMaxOpenConns, cfg.MySQLMaxIdleConns)
 	if err != nil {
 		logger.Error("failed to connect to mysql", "err", err)
 		return err
 	}
 	defer db.Close()
-
-	if err := runMigrations(db, logger); err != nil {
-		logger.Error("failed to run migrations", "err", err)
-		return err
-	}
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
@@ -101,7 +101,13 @@ func run() error {
 	return nil
 }
 
-func runMigrations(db *sql.DB, logger *slog.Logger) error {
+func runMigrations(dsn string, logger *slog.Logger) error {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return fmt.Errorf("migrate: open: %w", err)
+	}
+	defer db.Close()
+
 	driver, err := migmysql.WithInstance(db, &migmysql.Config{})
 	if err != nil {
 		return fmt.Errorf("migrate: driver: %w", err)
