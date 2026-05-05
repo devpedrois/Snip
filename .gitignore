@@ -27,6 +27,8 @@
 .DS_Store
 
 # Docker
+
+# Git worktrees
 .worktrees/
 
 # Logs
