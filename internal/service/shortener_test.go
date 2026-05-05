@@ -19,10 +19,10 @@ const testBaseURL = "http://localhost:8080"
 var testVTTimeout = 5 * time.Second
 
 type mockURLRepository struct {
-	createFn             func(ctx context.Context, u *domain.URL) error
-	updateHashFn         func(ctx context.Context, id uint64, h string) error
-	updateVTResultFn     func(ctx context.Context, id uint64, result scanner.ScanResult) error
-	findByOriginalURLFn  func(ctx context.Context, originalURL string) (*domain.URL, error)
+	createFn            func(ctx context.Context, u *domain.URL) error
+	updateHashFn        func(ctx context.Context, id uint64, h string) error
+	updateVTResultFn    func(ctx context.Context, id uint64, result scanner.ScanResult) error
+	findByOriginalURLFn func(ctx context.Context, originalURL string) (*domain.URL, error)
 }
 
 func (m *mockURLRepository) Create(ctx context.Context, u *domain.URL) error {

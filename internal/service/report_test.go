@@ -13,7 +13,7 @@ import (
 )
 
 type mockReportURLRepo struct {
-	findByHashFn    func(ctx context.Context, hash string) (*domain.URL, error)
+	findByHashFn     func(ctx context.Context, hash string) (*domain.URL, error)
 	updateVTStatusFn func(ctx context.Context, id uint64, status string) error
 }
 
@@ -80,7 +80,7 @@ func TestReportService_Report(t *testing.T) {
 				findByHashFn: func(_ context.Context, _ string) (*domain.URL, error) { return existingURL, nil },
 			},
 			reportRepo: &mockReportRepo{
-				insertFn: func(_ context.Context, _ *domain.Report) error { return nil },
+				insertFn:                  func(_ context.Context, _ *domain.Report) error { return nil },
 				countDistinctIPsByURLIDFn: func(_ context.Context, _ uint64) (int64, error) { return 1, nil },
 			},
 			cache:     &mockReportCache{},
@@ -150,7 +150,7 @@ func TestReportService_Report(t *testing.T) {
 				}
 			}(),
 			reportRepo: &mockReportRepo{
-				insertFn: func(_ context.Context, _ *domain.Report) error { return nil },
+				insertFn:                  func(_ context.Context, _ *domain.Report) error { return nil },
 				countDistinctIPsByURLIDFn: func(_ context.Context, _ uint64) (int64, error) { return 5, nil },
 			},
 			cache: func() *mockReportCache {

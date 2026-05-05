@@ -6,9 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devpedrois/snip/internal/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/devpedrois/snip/internal/hash"
 )
 
 func TestEncode_MinLength(t *testing.T) {
@@ -32,7 +33,7 @@ func TestEncode_OnlyAlphabetChars(t *testing.T) {
 
 func TestDecodeEncode_RoundTrip(t *testing.T) {
 	for i := 0; i < 1000; i++ {
-		id := rand.Uint64() % (math.MaxUint32 * 100)
+		id := rand.Uint64() % (math.MaxUint32 * 100) //nolint:gosec
 		encoded := hash.Encode(id)
 		decoded, err := hash.Decode(encoded)
 		require.NoError(t, err)

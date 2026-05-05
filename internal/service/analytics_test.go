@@ -5,10 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/devpedrois/snip/internal/domain"
-	"github.com/devpedrois/snip/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/devpedrois/snip/internal/domain"
+	"github.com/devpedrois/snip/internal/service"
 )
 
 type mockURLFinder struct {
@@ -21,12 +22,12 @@ func (m *mockURLFinder) FindByHash(_ context.Context, _ string) (*domain.URL, er
 }
 
 type mockClickReader struct {
-	count         int64
-	countErr      error
-	dailyCounts   []domain.DailyCount
-	groupErr      error
-	userAgents    []domain.UserAgentCount
-	userAgentErr  error
+	count        int64
+	countErr     error
+	dailyCounts  []domain.DailyCount
+	groupErr     error
+	userAgents   []domain.UserAgentCount
+	userAgentErr error
 }
 
 func (m *mockClickReader) CountByURLID(_ context.Context, _ uint64) (int64, error) {

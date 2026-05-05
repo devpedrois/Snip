@@ -7,10 +7,11 @@ import (
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
-	"github.com/devpedrois/snip/internal/domain"
-	"github.com/devpedrois/snip/internal/repository/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/devpedrois/snip/internal/domain"
+	"github.com/devpedrois/snip/internal/repository/mysql"
 )
 
 func newClickRepo(t *testing.T) (mysql.ClickRepository, sqlmock.Sqlmock) {

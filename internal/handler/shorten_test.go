@@ -166,7 +166,7 @@ func TestShortenHandler_BodyTooLarge(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	middleware.BodyLimit(1 << 20)(http.HandlerFunc(h.Handle)).ServeHTTP(w, req)
+	middleware.BodyLimit(1<<20)(http.HandlerFunc(h.Handle)).ServeHTTP(w, req)
 
 	res := w.Result()
 	assert.Equal(t, http.StatusRequestEntityTooLarge, res.StatusCode)

@@ -14,7 +14,6 @@ import (
 	"github.com/devpedrois/snip/internal/scanner"
 )
 
-
 type mockScanner struct {
 	scanFn func(ctx context.Context, url string) (scanner.ScanResult, error)
 }

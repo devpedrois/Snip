@@ -18,8 +18,8 @@ type ClickReader interface {
 }
 
 type Stats struct {
-	TotalClicks   int64                  `json:"total_clicks"`
-	ClicksByDay   []domain.DailyCount    `json:"clicks_by_day"`
+	TotalClicks   int64                   `json:"total_clicks"`
+	ClicksByDay   []domain.DailyCount     `json:"clicks_by_day"`
 	TopUserAgents []domain.UserAgentCount `json:"top_user_agents"`
 }
 
@@ -28,8 +28,8 @@ type AnalyticsService interface {
 }
 
 type analyticsService struct {
-	urlRepo    URLFinder
-	clickRepo  ClickReader
+	urlRepo   URLFinder
+	clickRepo ClickReader
 }
 
 func NewAnalyticsService(urlRepo URLFinder, clickRepo ClickReader) AnalyticsService {

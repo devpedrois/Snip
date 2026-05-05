@@ -20,8 +20,8 @@ type detailHealthResponse struct {
 }
 
 type HealthHandler struct {
-	db             *sql.DB
-	redis          *goredis.Client
+	db              *sql.DB
+	redis           *goredis.Client
 	healthSecretKey string
 }
 

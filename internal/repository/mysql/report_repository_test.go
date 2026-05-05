@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
-	"github.com/devpedrois/snip/internal/domain"
-	"github.com/devpedrois/snip/internal/repository/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/devpedrois/snip/internal/domain"
+	"github.com/devpedrois/snip/internal/repository/mysql"
 )
 
 func newReportRepo(t *testing.T) (*mysql.MySQLReportRepository, sqlmock.Sqlmock) {
@@ -31,7 +32,7 @@ func TestReportRepository_Insert(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "success",
+			name:   "success",
 			report: &domain.Report{URLID: 1, ReporterIP: "192.168.1.0", Reason: "phishing"},
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(q).
@@ -41,7 +42,7 @@ func TestReportRepository_Insert(t *testing.T) {
 			wantID: 10,
 		},
 		{
-			name: "duplicate entry returns ErrDuplicateReport",
+			name:   "duplicate entry returns ErrDuplicateReport",
 			report: &domain.Report{URLID: 1, ReporterIP: "192.168.1.0", Reason: "spam"},
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(q).
@@ -51,7 +52,7 @@ func TestReportRepository_Insert(t *testing.T) {
 			wantErr: domain.ErrDuplicateReport,
 		},
 		{
-			name: "generic db error",
+			name:   "generic db error",
 			report: &domain.Report{URLID: 2, ReporterIP: "10.0.0.0", Reason: "malware"},
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(q).

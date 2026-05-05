@@ -3,8 +3,9 @@ package analytics_test
 import (
 	"testing"
 
-	"github.com/devpedrois/snip/internal/analytics"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/devpedrois/snip/internal/analytics"
 )
 
 func TestAnonymizeIP(t *testing.T) {

@@ -1,0 +1,30 @@
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - contextcheck
+    - errorlint
+    - gofmt
+    - goimports
+    - gosec
+    - misspell
+    - noctx
+    - prealloc
+
+linters-settings:
+  gosec:
+    excludes:
+      - G115
+
+  goimports:
+    local-prefixes: github.com/devpedrois/snip
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 5

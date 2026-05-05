@@ -8,11 +8,12 @@ import (
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/devpedrois/snip/internal/domain"
 	"github.com/devpedrois/snip/internal/repository/mysql"
 	"github.com/devpedrois/snip/internal/scanner"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func newURLRepo(t *testing.T) (mysql.URLRepository, sqlmock.Sqlmock) {

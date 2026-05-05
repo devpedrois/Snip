@@ -18,9 +18,9 @@ type RescanCacheDeleter interface {
 }
 
 type Rescanner struct {
-	scanner URLScanner
-	urlRepo RescanURLRepository
-	cache   RescanCacheDeleter
+	scanner  URLScanner
+	urlRepo  RescanURLRepository
+	cache    RescanCacheDeleter
 	interval time.Duration
 }
 

@@ -3,8 +3,9 @@ package middleware_test
 import (
 	"testing"
 
-	"github.com/devpedrois/snip/internal/middleware"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/devpedrois/snip/internal/middleware"
 )
 
 func TestSanitizeLogValue(t *testing.T) {

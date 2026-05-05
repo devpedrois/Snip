@@ -230,4 +230,3 @@ func runMigrations(dsn string, logger *slog.Logger) error {
 	logger.Info("migrations applied")
 	return nil
 }
-

@@ -5,8 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/devpedrois/snip/internal/middleware"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/devpedrois/snip/internal/middleware"
 )
 
 func TestSecurityHeaders(t *testing.T) {

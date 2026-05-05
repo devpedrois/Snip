@@ -67,7 +67,7 @@ func (d *Dispatcher) Run(ctx context.Context) {
 
 	for i := 0; i < d.numWorkers; i++ {
 		d.wg.Add(1)
-		go d.worker()
+		go d.worker() //nolint:contextcheck
 	}
 
 	go d.statsLoop(statsCtx)
