@@ -20,7 +20,7 @@ func newURLRepo(t *testing.T) (mysql.URLRepository, sqlmock.Sqlmock) {
 	t.Helper()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { db.Close() }) //nolint:errcheck,gosec
 	return mysql.NewURLRepository(db), mock
 }
 

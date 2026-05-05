@@ -72,14 +72,18 @@ func run() error {
 		logger.Error("failed to connect to mysql", "err", err)
 		return err
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	redisClient, err := redisrepo.NewRedisClient(cfg)
 	if err != nil {
 		logger.Error("failed to connect to redis", "err", err)
 		return err
 	}
-	defer redisClient.Close()
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			logger.Error("redis close failed", "err", err)
+		}
+	}()
 
 	urlCache := redisrepo.NewRedisURLCache(redisClient)
 	urlRepo := mysqlrepo.NewURLRepository(db)
@@ -91,7 +95,7 @@ func run() error {
 
 	var vtScannerDirect scanner.URLScanner
 	if cfg.VTEnabled {
-		vtScannerDirect = scanner.NewVirusTotalScanner(cfg.VTAPIKey, cfg.VTTimeoutSeconds, cfg.VTMinPositives)
+		vtScannerDirect = scanner.NewVirusTotalScanner(cfg.VTAPIKey, cfg.VTTimeout, cfg.VTMinPositives)
 	} else {
 		vtScannerDirect = scanner.NewNoopScanner()
 	}
@@ -101,7 +105,7 @@ func run() error {
 	rescanInterval := time.Duration(cfg.VTRescanIntervalHours) * time.Hour
 	rescanner := scanner.NewRescanner(vtScannerDirect, urlRepo, urlCache, rescanInterval)
 
-	shortenerSvc := service.NewShortenerService(urlRepo, urlCache, cachedScanner, cfg.BaseURL, cfg.URLExpirationDays, cfg.VTTimeoutSeconds)
+	shortenerSvc := service.NewShortenerService(urlRepo, urlCache, cachedScanner, cfg.BaseURL, cfg.URLExpirationDays, cfg.VTTimeout)
 	shortenHandler := handler.NewShortenHandler(shortenerSvc, cfg.BaseURL)
 
 	redirectorSvc := service.NewRedirectorService(urlRepo, urlCache, cfg.RedisTTLDays)
@@ -210,7 +214,7 @@ func runMigrations(dsn string, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("migrate: open: %w", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	driver, err := migmysql.WithInstance(db, &migmysql.Config{})
 	if err != nil {
@@ -221,7 +225,7 @@ func runMigrations(dsn string, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("migrate: init: %w", err)
 	}
-	defer m.Close()
+	defer m.Close() //nolint:errcheck
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migrate: up: %w", err)

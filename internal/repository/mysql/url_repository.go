@@ -46,7 +46,7 @@ func (r *MySQLURLRepository) Create(ctx context.Context, u *domain.URL) error {
 		return fmt.Errorf("url_repository: last insert id: %w", err)
 	}
 
-	u.ID = uint64(id)
+	u.ID = uint64(id) //nolint:gosec
 	return nil
 }
 
@@ -124,7 +124,7 @@ func (r *MySQLURLRepository) FindByVTStatus(ctx context.Context, status string) 
 	if err != nil {
 		return nil, fmt.Errorf("url_repository: find by vt status: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var urls []*domain.URL
 	for rows.Next() {

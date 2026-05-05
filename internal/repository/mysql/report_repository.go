@@ -41,7 +41,7 @@ func (r *MySQLReportRepository) Insert(ctx context.Context, rep *domain.Report) 
 		return fmt.Errorf("report_repository: last insert id: %w", err)
 	}
 
-	rep.ID = uint64(id)
+	rep.ID = uint64(id) //nolint:gosec
 	return nil
 }
 

@@ -20,7 +20,7 @@ func openDeadMySQL(t *testing.T) *sql.DB {
 	t.Helper()
 	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:1)/nonexistent?timeout=500ms")
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { db.Close() }) //nolint:errcheck,gosec
 	return db
 }
 
@@ -41,7 +41,7 @@ func TestHealthHandler_Public_OK(t *testing.T) {
 
 	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:1)/nonexistent?timeout=500ms")
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { db.Close() }) //nolint:errcheck,gosec
 
 	h := handler.NewHealthHandler(db, redis)
 	w := httptest.NewRecorder()
@@ -97,7 +97,7 @@ func TestHealthHandler_Details_CorrectHeader_Returns200(t *testing.T) {
 
 	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:1)/nonexistent?timeout=500ms")
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { db.Close() }) //nolint:errcheck,gosec
 
 	h := handler.NewHealthHandlerWithSecret(db, redis, "secret123")
 	req := httptest.NewRequest(http.MethodGet, "/health/details", nil)

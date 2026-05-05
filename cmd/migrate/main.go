@@ -30,7 +30,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "open: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	driver, err := migmysql.WithInstance(db, &migmysql.Config{})
 	if err != nil {
@@ -43,7 +43,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "init: %v\n", err)
 		os.Exit(1)
 	}
-	defer m.Close()
+	defer m.Close() //nolint:errcheck
 
 	switch os.Args[1] {
 	case "up":

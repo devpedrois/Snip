@@ -51,7 +51,7 @@ func TestDispatcher_Submit_dropsWhenBufferFull(t *testing.T) {
 	d := analytics.NewDispatcher(noopClickRepo(), noopURLRepo(), 0, bufferSize)
 
 	for i := 0; i < bufferSize; i++ {
-		d.Submit(analytics.ClickEvent{URLID: uint64(i + 1), AccessedAt: time.Now()})
+		d.Submit(analytics.ClickEvent{URLID: uint64(i + 1), AccessedAt: time.Now()}) //nolint:gosec
 	}
 
 	d.Submit(analytics.ClickEvent{URLID: 99, AccessedAt: time.Now()})
@@ -147,7 +147,7 @@ func TestDispatcher_Shutdown_drainsRemainingEvents(t *testing.T) {
 
 	const total = 10
 	for i := 0; i < total; i++ {
-		d.Submit(analytics.ClickEvent{URLID: uint64(i + 1), AccessedAt: time.Now()})
+		d.Submit(analytics.ClickEvent{URLID: uint64(i + 1), AccessedAt: time.Now()}) //nolint:gosec
 	}
 
 	d.Shutdown(2 * time.Second)

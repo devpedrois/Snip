@@ -40,7 +40,7 @@ func (r *MySQLClickRepository) Insert(ctx context.Context, c *domain.Click) erro
 		return fmt.Errorf("click_repository: last insert id: %w", err)
 	}
 
-	c.ID = uint64(id)
+	c.ID = uint64(id) //nolint:gosec
 	return nil
 }
 
@@ -68,7 +68,7 @@ func (r *MySQLClickRepository) GroupByDay(ctx context.Context, urlID uint64, day
 	if err != nil {
 		return nil, fmt.Errorf("click_repository: group by day: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []domain.DailyCount
 	for rows.Next() {
@@ -99,7 +99,7 @@ func (r *MySQLClickRepository) TopUserAgents(ctx context.Context, urlID uint64, 
 	if err != nil {
 		return nil, fmt.Errorf("click_repository: top user agents: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []domain.UserAgentCount
 	for rows.Next() {

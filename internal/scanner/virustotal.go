@@ -77,7 +77,7 @@ func (v *VirusTotalScanner) submit(ctx context.Context, rawURL string) (string, 
 		slog.Warn("virustotal: submit: request", "err", err)
 		return "", false
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		slog.Warn("virustotal: submit: unexpected status", "status", resp.StatusCode)
@@ -132,7 +132,7 @@ func (v *VirusTotalScanner) fetchAnalysis(ctx context.Context, id, permalink str
 		slog.Warn("virustotal: poll: request", "err", err)
 		return ScanResult{Status: ScanUnverified, ScannedAt: time.Now()}, true
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		slog.Warn("virustotal: poll: unexpected status", "status", resp.StatusCode)

@@ -49,7 +49,7 @@ type Config struct {
 
 	VTEnabled             bool
 	VTAPIKey              string
-	VTTimeoutSeconds      time.Duration
+	VTTimeout             time.Duration
 	VTMinPositives        int
 	VTCacheTTLHours       int
 	VTRescanIntervalHours int
@@ -135,7 +135,7 @@ func LoadConfig() (*Config, error) {
 	if err != nil {
 		parseErrs = append(parseErrs, err.Error())
 	}
-	cfg.VTTimeoutSeconds = time.Duration(vtTimeoutSecs) * time.Second
+	cfg.VTTimeout = time.Duration(vtTimeoutSecs) * time.Second
 
 	if cfg.VTMinPositives, err = parseIntEnv("VT_MIN_POSITIVES", 2); err != nil {
 		parseErrs = append(parseErrs, err.Error())

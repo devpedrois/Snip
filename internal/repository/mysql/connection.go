@@ -25,7 +25,7 @@ func NewMySQLDB(ctx context.Context, dsn string, maxOpen, maxIdle int) (*sql.DB,
 	defer cancel()
 
 	if err := db.PingContext(pingCtx); err != nil {
-		db.Close()
+		db.Close() //nolint:errcheck,gosec
 		return nil, fmt.Errorf("mysql: ping: %w", err)
 	}
 

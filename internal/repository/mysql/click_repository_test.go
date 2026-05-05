@@ -18,7 +18,7 @@ func newClickRepo(t *testing.T) (mysql.ClickRepository, sqlmock.Sqlmock) {
 	t.Helper()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { db.Close() }) //nolint:errcheck,gosec
 	return mysql.NewClickRepository(db), mock
 }
 
