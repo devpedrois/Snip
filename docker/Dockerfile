@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 
@@ -21,7 +21,7 @@ WORKDIR /app
 COPY --from=builder /snip .
 COPY --from=builder /build/migrations ./migrations
 
-RUN adduser -D -g '' appuser
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 EXPOSE 8080

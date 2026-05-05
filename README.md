@@ -1,266 +1,474 @@
-# snip
+# ✂️ Snip
 
-A production-ready URL shortener API written in Go, demonstrating idiomatic concurrency patterns, cache-aside architecture, and asynchronous analytics processing.
+A production-ready URL shortener API built with Go, featuring Redis cache-aside, async analytics via goroutines, and graceful shutdown — designed as a high-concurrency microservice demonstration.
 
-## Overview
+![Go Version](https://img.shields.io/badge/go-1.22%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+[![CI](https://github.com/devpedrois/snip/actions/workflows/ci.yml/badge.svg)](https://github.com/devpedrois/snip/actions/workflows/ci.yml)
 
-**snip** is a RESTful microservice that shortens URLs with the following characteristics:
+---
 
-- **Cache-Aside Pattern**: Redis cache layer in front of MySQL for high-performance reads
-- **Async Analytics**: Goroutine-based worker pool for non-blocking click tracking
-- **Idiomatic Go**: Proper context propagation, graceful shutdown, interface-driven design
-- **Production-Grade**: Structured logging, comprehensive error handling, containerized deployment
+## 📋 Table of Contents
 
-### Architecture
+- [About](#-about)
+- [Architecture](#-architecture)
+- [Stack](#-stack)
+- [Prerequisites](#-prerequisites)
+- [Getting Started](#-getting-started)
+- [Testing](#-testing)
+- [API Reference](#-api-reference)
+- [Environment Variables](#-environment-variables)
+- [Project Structure](#-project-structure)
+- [Architecture Decisions](#-architecture-decisions)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Client Requests                                          │
-└──────────────────┬──────────────────────────────────────┘
-                   │
-         ┌─────────┴─────────┐
-         │                   │
-    ┌────▼─────┐      ┌─────▼────┐
-    │  GET /{} │      │POST /api/ │
-    │ (redirect)│      │  shorten  │
-    └────┬─────┘      └─────┬────┘
-         │                   │
-    ┌────▼────────────────────▼────┐
-    │  Cache-Aside (Redis)          │
-    │  - Miss → MySQL → Populate    │
-    │  - TTL: 30 days               │
-    └────┬────────────────────┬────┘
-         │                    │
-         │            ┌───────▼────────┐
-         │            │ Fire-and-Forget │
-         │            │ Click Event     │
-         │            └───────┬────────┘
-         │                    │
-    ┌────▼─────────────────────▼────┐
-    │ MySQL (Persistent Store)       │
-    │ - urls table (7-char hash)     │
-    │ - clicks table (analytics)     │
-    │ - Foreign keys enforced        │
-    └──────────────────────────────┘
-         │
-    ┌────▼──────────────────────────┐
-    │ Analytics Workers (goroutines) │
-    │ - Concurrent writes            │
-    │ - Batch processing ready       │
-    └───────────────────────────────┘
-```
+---
 
-## Prerequisites
+## 🎯 About
 
-- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/)
-- [Go 1.24+](https://golang.org/dl/) (development only)
+**Snip** demonstrates idiomatic Go patterns in a real-world scenario:
 
-## Quick Start
+- Goroutines and channels for non-blocking analytics ingestion
+- Cache-aside pattern with Redis in front of MySQL
+- Context propagation from HTTP handler down to database layer
+- Graceful shutdown draining in-flight events before exit
+- Structured logging with `log/slog` (JSON in production, text in development)
 
-```bash
-# Clone and navigate to project
-git clone <repository>
-cd snip
+The goal is a codebase that a new Go developer can read end-to-end and understand every decision.
 
-# Load environment variables
-cp .env.example .env
+---
 
-# Start services (MySQL, Redis, API)
-make up
+## 🏗️ Architecture
 
-# Verify health
-curl http://localhost:8080/health
-# Response: {"status":"ok"}
+### POST /api/shorten — Create Short URL
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API
+    participant M as MySQL
+    participant R as Redis
+
+    C->>A: POST /api/shorten {"url": "https://..."}
+    A->>M: INSERT INTO urls
+    M-->>A: id (auto-increment)
+    A->>M: UPDATE urls SET hash = base62(id)
+    A->>R: SET snip:url:{hash} originalURL TTL=30d
+    A-->>C: 201 {"hash":"0000001","short_url":"http://host/0000001"}
 ```
 
-## Project Structure
+### GET /{hash} — Redirect
 
-```
-snip/
-├── cmd/api/                 # Application entrypoint
-├── internal/
-│   ├── config/              # Environment configuration
-│   ├── domain/              # Domain entities and errors
-│   ├── handler/             # HTTP handlers (future)
-│   ├── service/             # Business logic (future)
-│   ├── repository/
-│   │   ├── mysql/           # MySQL driver and pool
-│   │   └── redis/           # Redis cache (future)
-│   ├── middleware/          # HTTP middleware (future)
-│   ├── hash/                # Base62 encoder (future)
-│   └── analytics/           # Worker pool (future)
-├── migrations/              # SQL migrations (golang-migrate)
-├── tests/                   # Integration & e2e tests
-├── docker/                  # Docker configuration
-├── Makefile                 # Development targets
-├── docker-compose.yml       # Local environment
-└── .env.example             # Example environment variables
-```
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API
+    participant R as Redis
+    participant M as MySQL
+    participant W as Worker Pool
 
-## API Endpoints (Planned)
-
-### Create Short URL
-```
-POST /api/shorten
-Content-Type: application/json
-
-{
-  "url": "https://example.com/very/long/path?param=value"
-}
-
-Response (201):
-{
-  "hash": "abc1234",
-  "short_url": "http://localhost:8080/abc1234"
-}
+    C->>A: GET /0000001
+    A->>R: GET snip:url:0000001
+    alt Cache Hit
+        R-->>A: original_url
+    else Cache Miss
+        R-->>A: nil
+        A->>M: SELECT * FROM urls WHERE hash = ?
+        M-->>A: url record
+        A->>R: SET snip:url:0000001 ... TTL=30d
+    end
+    A-->>C: 301 Location: original_url
+    A-)W: ClickEvent{url_id, ip, user_agent}
+    W->>M: INSERT INTO clicks (async)
 ```
 
-### Redirect to Original URL
-```
-GET /{hash}
+### Analytics — Async Click Ingestion
 
-Response (301): Location: https://example.com/very/long/path?param=value
-```
-
-### Analytics
-```
-GET /api/analytics/{hash}
-
-Response (200):
-{
-  "total_clicks": 1250,
-  "clicks_last_30_days": [...],
-  "top_user_agents": [...]
-}
+```mermaid
+graph LR
+    RH[RedirectHandler] -->|Submit| CH[(Buffered Channel)]
+    CH --> W1[Worker 1]
+    CH --> W2[Worker 2]
+    CH --> Wn[Worker N]
+    W1 --> DB[(MySQL clicks)]
+    W2 --> DB
+    Wn --> DB
 ```
 
-## Configuration
+---
 
-All configuration is loaded from environment variables. See `.env.example` for defaults:
+## 🛠️ Stack
 
-| Variable | Default | Description |
+| Layer | Technology |
+|---|---|
+| Language | Go 1.22+ |
+| HTTP Router | `chi` v5 |
+| Database | MySQL 8 |
+| MySQL Driver | `go-sql-driver/mysql` |
+| Migrations | `golang-migrate/migrate` |
+| Cache | Redis 7 |
+| Redis Client | `redis/go-redis` v9 |
+| Logging | `log/slog` (stdlib) |
+| Configuration | `joho/godotenv` + env vars |
+| Testing | `testing` + `testify` |
+| Integration Tests | `testcontainers-go` |
+| Containerization | Docker + Docker Compose |
+
+---
+
+## 📦 Prerequisites
+
+| Tool | Version | Purpose |
 |---|---|---|
-| `APP_PORT` | 8080 | HTTP server port |
-| `APP_ENV` | development | Logging format (development/production) |
-| `MYSQL_HOST` | mysql | MySQL hostname |
-| `MYSQL_USER` | shortener | MySQL user |
-| `MYSQL_PASSWORD` | shortener_pass | MySQL password |
-| `MYSQL_DATABASE` | snip | Database name |
-| `REDIS_HOST` | redis | Redis hostname |
-| `REDIS_TTL_DAYS` | 30 | Cache TTL |
-| `ANALYTICS_WORKERS` | 4 | Goroutine worker pool size |
-| `URL_EXPIRATION_DAYS` | 30 | Link expiration period |
+| Docker | 24+ | Run containers |
+| Docker Compose | v2+ | Orchestrate services |
+| Make | any | Run Makefile targets |
+| Go | 1.22+ | Local development and tests |
 
-## Development
+---
 
-### Build from source
+## 🚀 Getting Started
+
+### 1. Clone the repository
+
 ```bash
-go build ./cmd/api
+git clone https://github.com/devpedrois/snip.git
+cd snip
 ```
 
-### Run tests
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Defaults work out of the box for local development.
+
+### 3. Start all services
+
+```bash
+make up
+```
+
+Builds the API image, starts MySQL 8 + Redis 7 + API, runs database migrations on startup, and waits for all healthchecks to pass.
+
+### 4. Verify the stack is up
+
+```bash
+curl http://localhost:8080/health
+# {"status":"ok","mysql":"up","redis":"up"}
+```
+
+### 5. Create a short URL
+
+```bash
+curl -s -X POST http://localhost:8080/api/shorten \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://github.com/devpedrois/snip"}' | jq
+```
+
+```json
+{
+  "hash": "0000001",
+  "short_url": "http://localhost:8080/0000001"
+}
+```
+
+### 6. Follow the redirect
+
+```bash
+curl -I http://localhost:8080/0000001
+# HTTP/1.1 301 Moved Permanently
+# Location: https://github.com/devpedrois/snip
+```
+
+### 7. View analytics
+
+```bash
+curl -s http://localhost:8080/api/analytics/0000001 | jq
+```
+
+```json
+{
+  "total_clicks": 1,
+  "clicks_by_day": [{"date": "2026-05-03", "count": 1}],
+  "top_user_agents": [{"user_agent": "curl/8.5.0", "count": 1}]
+}
+```
+
+---
+
+## 🧪 Testing
+
+### Unit tests
+
 ```bash
 make test
 ```
 
-### Code quality checks
+### Unit tests with race detector
+
 ```bash
-make lint          # golangci-lint
-make fmt           # gofmt
-go vet ./...       # go vet
+make test-race
 ```
 
-### Database migrations
+### Integration tests (requires Docker)
+
 ```bash
-make migrate-up    # Apply pending migrations
-make migrate-down  # Revert last migration
+make test-integration
 ```
 
-### Logs
+Integration tests spin up ephemeral MySQL and Redis containers via `testcontainers-go`, exercise the full HTTP stack, and tear everything down after.
+
+### Coverage report
+
 ```bash
-docker compose logs -f api      # Stream API logs
-docker compose logs -f mysql    # Stream MySQL logs
-docker compose logs -f redis    # Stream Redis logs
+make coverage
+# Prints total coverage % to terminal
+# Generates coverage.html for detailed view
 ```
 
-## Technology Stack
+---
 
-| Layer | Technology |
-|---|---|
-| Language | Go 1.24+ |
-| HTTP Router | chi/v5 |
-| Database | MySQL 8 |
-| Cache | Redis 7 |
-| Migrations | golang-migrate/v4 |
-| Logging | log/slog (stdlib) |
-| Testing | testify, go-sqlmock |
-| Containerization | Docker + Docker Compose |
+## 🔌 API Reference
 
-## Design Decisions
+### `POST /api/shorten`
 
-### Cache-Aside (Lazy Loading)
-- Cache miss on read: query MySQL → populate Redis → respond
-- Keeps cache fresh without background jobs for reads
-- Suitable for read-heavy, variable-traffic workloads
+Creates a shortened URL.
 
-### Async Analytics
-- Click events are **non-blocking** via channel dispatch
-- Goroutine workers consume events concurrently
-- Server responds before database write completes
-- Graceful shutdown drains pending events
+**Request:**
 
-### Base62 Hashing
-- 7-character hash generated from auto-increment ID
-- Deterministic: same ID always produces same hash
-- Collision-free by design
-
-### Expiration Strategy
-- Links expire after 30 days of inactivity
-- `last_accessed_at` updated in background (non-blocking)
-- Queries include expiration check for stale link detection
-
-## Deployment
-
-### Production Build
 ```bash
-docker compose -f docker-compose.yml build
-docker compose -f docker-compose.yml up -d
+curl -X POST http://localhost:8080/api/shorten \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/some/long/path"}'
 ```
 
-### Health Check
+**Response — 201 Created:**
+
+```json
+{
+  "hash": "0000001",
+  "short_url": "http://localhost:8080/0000001"
+}
+```
+
+**Error responses:**
+
+| Status | Code | Reason |
+|---|---|---|
+| 400 | `ERR_INVALID_URL` | URL missing scheme or invalid host |
+| 400 | `ERR_INVALID_BODY` | Malformed JSON body |
+| 500 | `ERR_INTERNAL` | Database error |
+
+---
+
+### `GET /{hash}`
+
+Redirects to the original URL.
+
+**Request:**
+
+```bash
+curl -I http://localhost:8080/0000001
+```
+
+**Response — 301 Moved Permanently:**
+
+```
+Location: https://example.com/some/long/path
+```
+
+**Error responses:**
+
+| Status | Code | Reason |
+|---|---|---|
+| 404 | `ERR_NOT_FOUND` | Hash does not exist |
+| 410 | `ERR_URL_EXPIRED` | URL passed its expiration date |
+
+---
+
+### `GET /api/analytics/{hash}`
+
+Returns click analytics for a short URL.
+
+**Request:**
+
+```bash
+curl http://localhost:8080/api/analytics/0000001
+```
+
+**Response — 200 OK:**
+
+```json
+{
+  "total_clicks": 42,
+  "clicks_by_day": [
+    {"date": "2026-05-01", "count": 20},
+    {"date": "2026-05-02", "count": 22}
+  ],
+  "top_user_agents": [
+    {"user_agent": "curl/8.5.0", "count": 30},
+    {"user_agent": "Mozilla/5.0", "count": 12}
+  ]
+}
+```
+
+**Error responses:**
+
+| Status | Code | Reason |
+|---|---|---|
+| 404 | `ERR_NOT_FOUND` | Hash does not exist |
+| 500 | `ERR_INTERNAL` | Database error |
+
+---
+
+### `GET /health`
+
+Reports the health of the API and its dependencies.
+
+**Request:**
+
 ```bash
 curl http://localhost:8080/health
 ```
 
-### Shutdown
-```bash
-docker compose down
-# Graceful shutdown: 10s timeout for in-flight requests
+**Response — 200 OK (all up):**
+
+```json
+{"status": "ok", "mysql": "up", "redis": "up"}
 ```
 
-## Performance Characteristics
+**Response — 503 Service Unavailable (degraded):**
 
-- **Cache Hit**: ~1ms (Redis lookup)
-- **Cache Miss**: ~5-10ms (MySQL + Redis populate)
-- **Analytics**: Non-blocking (p99 latency unaffected)
-- **Worker Pool**: Tunable via `ANALYTICS_WORKERS` env var
+```json
+{"status": "degraded", "mysql": "down", "redis": "up"}
+```
 
-## Monitoring (Future)
+---
 
-- Structured logging with request IDs
-- Prometheus metrics on handler latencies
-- Graceful shutdown with drain period
+## ⚙️ Environment Variables
 
-## Contributing
+| Variable | Default | Description |
+|---|---|---|
+| `APP_PORT` | `8080` | HTTP server port |
+| `APP_ENV` | `development` | `development` (text logs) or `production` (JSON logs) |
+| `BASE_URL` | `http://localhost:8080` | Used to build `short_url` in responses |
+| `MYSQL_HOST` | — | MySQL hostname (required) |
+| `MYSQL_PORT` | `3306` | MySQL port |
+| `MYSQL_USER` | — | MySQL username (required) |
+| `MYSQL_PASSWORD` | — | MySQL password (required) |
+| `MYSQL_DATABASE` | — | MySQL database name (required) |
+| `MYSQL_MAX_OPEN_CONNS` | `25` | Max open connections in pool |
+| `MYSQL_MAX_IDLE_CONNS` | `10` | Max idle connections in pool |
+| `REDIS_HOST` | — | Redis hostname (required) |
+| `REDIS_PORT` | `6379` | Redis port |
+| `REDIS_PASSWORD` | `` | Redis AUTH password (empty = no auth) |
+| `REDIS_DB` | `0` | Redis database index |
+| `REDIS_TTL_DAYS` | `30` | Cache TTL in days |
+| `ANALYTICS_WORKERS` | `4` | Goroutine pool size for click event consumption |
+| `ANALYTICS_BUFFER` | `1000` | Buffered channel capacity for click events |
+| `URL_EXPIRATION_DAYS` | `30` | Days before an idle URL expires |
 
-This project follows structured development practices:
+---
 
-- **Branching**: Feature branches (`feat/<slug>`, `fix/<slug>`)
-- **Commits**: Atomic, conventional format (`feat(scope): description`)
-- **Code Standards**: Clean Code principles, idiomatic Go patterns
-- **Testing**: Test-driven development (TDD) for new features
-- **Review**: All changes require code review before merge
+## 📁 Project Structure
 
-## License
+```
+snip/
+├── cmd/
+│   ├── api/
+│   │   └── main.go              # Entry point — wires dependencies and starts server
+│   └── migrate/
+│       └── main.go              # Standalone migration runner
+├── internal/
+│   ├── analytics/
+│   │   ├── dispatcher.go        # Buffered channel + goroutine worker pool
+│   │   └── event.go             # ClickEvent struct
+│   ├── config/
+│   │   └── config.go            # Env var loading with validation
+│   ├── domain/
+│   │   ├── url.go               # URL entity
+│   │   ├── click.go             # Click entity
+│   │   ├── analytics.go         # DailyCount / UserAgentCount value objects
+│   │   └── errors.go            # Sentinel errors (ErrURLNotFound, ErrURLExpired)
+│   ├── handler/
+│   │   ├── shorten.go           # POST /api/shorten
+│   │   ├── redirect.go          # GET /{hash}
+│   │   ├── analytics.go         # GET /api/analytics/{hash}
+│   │   ├── health.go            # GET /health — pings MySQL + Redis
+│   │   └── dto.go               # Request/response types and JSON helpers
+│   ├── hash/
+│   │   ├── base62.go            # Encode/Decode — maps uint64 ID to 7-char hash
+│   │   └── validator.go         # URL scheme and host validation
+│   ├── middleware/
+│   │   ├── logger.go            # Structured request logging (method, path, status, latency)
+│   │   ├── requestid.go         # Injects X-Request-ID into context
+│   │   └── recoverer.go         # Panic recovery
+│   └── repository/
+│       ├── mysql/
+│       │   ├── connection.go    # Connection pool setup with PingContext
+│       │   ├── url_repository.go
+│       │   └── click_repository.go
+│       └── redis/
+│           ├── connection.go    # Redis client setup
+│           └── cache.go         # URLCache — get/set with TTL
+├── migrations/
+│   ├── 000001_create_urls_table.up.sql
+│   ├── 000001_create_urls_table.down.sql
+│   ├── 000002_create_clicks_table.up.sql
+│   └── 000002_create_clicks_table.down.sql
+├── tests/
+│   └── integration/             # testcontainers-go — real MySQL + Redis per test run
+├── docker/
+│   └── Dockerfile               # Multi-stage build, minimal final image
+├── docker-compose.yml
+├── Makefile
+├── .env.example
+└── go.mod
+```
 
-MIT
+---
+
+## 🧠 Architecture Decisions
+
+- **`chi` over standard library mux** — URL parameter extraction (`{hash}`), middleware chaining, and route grouping without pulling in a full framework. Zero magic, idiomatic middleware interface.
+
+- **Cache-aside over write-through** — The application controls cache population explicitly. On a cache miss the handler reads MySQL, then populates Redis. Redis failure never blocks a write — it degrades gracefully and the redirect still succeeds.
+
+- **Async worker pool for analytics** — Click recording runs in a separate goroutine pool behind a buffered channel. The redirect response completes in roughly the time of a Redis GET, regardless of MySQL write latency. Dropped events are counted and logged rather than blocking callers.
+
+- **Base62 offset encoding** — IDs start at 1. The offset `(id - 1)` in Base62 ensures the first URL maps to `0000001` (exactly 7 chars). `Decode` reverses the offset to recover the original `id`. Collision-free and deterministic without a separate hash computation or random generation.
+
+- **`log/slog`** — Standard library structured logging added in Go 1.21. Zero external dependencies. JSON output in production, human-readable text in development. Every log entry carries `request_id` from middleware context, enabling distributed tracing without a full observability stack.
+
+---
+
+## 📈 Roadmap
+
+- **Rate limiting** — Token bucket per IP on `POST /api/shorten` to prevent abuse
+- **JWT authentication** — Auth layer so users can manage their own links
+- **Prometheus metrics** — `snip_http_requests_total`, `snip_cache_hits_total`, dispatcher queue depth gauge
+- **Analytics dashboard** — SSE feed of real-time click events per hash
+- **Custom slugs** — Authenticated users choose a vanity path (e.g. `/my-brand`)
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repo and create your branch from `main`
+2. Follow the branch naming convention: `feat/<slug>`, `fix/<slug>`, `docs/<slug>`
+3. Follow Conventional Commits: `feat(scope): description`, `fix(scope): description`
+4. Write or update tests for any changed code
+5. Run `make fmt && make lint && make test` before opening a PR
+6. Open a pull request against `main`
+
+**Accepted commit types:** `feat`, `fix`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`, `chore`
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).

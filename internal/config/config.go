@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -31,7 +32,27 @@ type Config struct {
 	AnalyticsWorkers int
 	AnalyticsBuffer  int
 
-	URLExpirationDays int
+	URLExpirationDays           int
+	BackgroundUpdateTimeoutSecs int
+
+	AllowedOrigins     string
+	TrustedProxies     string
+	RateLimitShorten   int
+	RateLimitRedirect  int
+	RateLimitAnalytics int
+	RateLimitReport    int
+
+	AnalyticsRetentionDays int
+	HealthSecretKey        string
+
+	ReportAutoBlockThreshold int
+
+	VTEnabled             bool
+	VTAPIKey              string
+	VTTimeoutSeconds      time.Duration
+	VTMinPositives        int
+	VTCacheTTLHours       int
+	VTRescanIntervalHours int
 }
 
 // LoadConfig loads configuration from environment variables, optionally from a .env file.
@@ -77,6 +98,52 @@ func LoadConfig() (*Config, error) {
 		parseErrs = append(parseErrs, err.Error())
 	}
 	if cfg.URLExpirationDays, err = parseIntEnv("URL_EXPIRATION_DAYS", 30); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+	if cfg.BackgroundUpdateTimeoutSecs, err = parseIntEnv("BACKGROUND_UPDATE_TIMEOUT_SECS", 2); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+
+	cfg.AllowedOrigins = envOrDefault("ALLOWED_ORIGINS", "*")
+	cfg.TrustedProxies = os.Getenv("TRUSTED_PROXIES")
+
+	if cfg.RateLimitShorten, err = parseIntEnv("RATE_LIMIT_SHORTEN", 5); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+	if cfg.RateLimitRedirect, err = parseIntEnv("RATE_LIMIT_REDIRECT", 60); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+	if cfg.RateLimitAnalytics, err = parseIntEnv("RATE_LIMIT_ANALYTICS", 30); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+	if cfg.RateLimitReport, err = parseIntEnv("RATE_LIMIT_REPORT", 3); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+	if cfg.AnalyticsRetentionDays, err = parseIntEnv("ANALYTICS_RETENTION_DAYS", 90); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+	cfg.HealthSecretKey = os.Getenv("HEALTH_SECRET_KEY")
+
+	if cfg.ReportAutoBlockThreshold, err = parseIntEnv("REPORT_AUTO_BLOCK_THRESHOLD", 5); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+
+	cfg.VTEnabled = envOrDefault("VT_ENABLED", "true") != "false"
+	cfg.VTAPIKey = os.Getenv("VIRUSTOTAL_API_KEY")
+
+	vtTimeoutSecs, err := parseIntEnv("VT_TIMEOUT_SECONDS", 10)
+	if err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+	cfg.VTTimeoutSeconds = time.Duration(vtTimeoutSecs) * time.Second
+
+	if cfg.VTMinPositives, err = parseIntEnv("VT_MIN_POSITIVES", 2); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+	if cfg.VTCacheTTLHours, err = parseIntEnv("VT_CACHE_TTL_HOURS", 24); err != nil {
+		parseErrs = append(parseErrs, err.Error())
+	}
+	if cfg.VTRescanIntervalHours, err = parseIntEnv("VT_RESCAN_INTERVAL_HOURS", 6); err != nil {
 		parseErrs = append(parseErrs, err.Error())
 	}
 

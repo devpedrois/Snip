@@ -17,11 +17,12 @@ func Logger(logger *slog.Logger) func(http.Handler) http.Handler {
 			next.ServeHTTP(ww, r)
 
 			logger.InfoContext(r.Context(), "request",
-				"method", r.Method,
-				"path", r.URL.Path,
+				"method", SanitizeLogValue(r.Method),
+				"path", SanitizeLogValue(r.URL.Path),
 				"status", ww.Status(),
 				"duration_ms", time.Since(start).Milliseconds(),
-				"request_id", chimw.GetReqID(r.Context()),
+				"request_id", GetRequestID(r.Context()),
+				"user_agent", SanitizeLogValue(r.Header.Get("User-Agent")),
 			)
 		})
 	}

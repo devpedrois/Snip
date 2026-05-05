@@ -14,6 +14,7 @@ type ClickRepository interface {
 	CountByURLID(ctx context.Context, urlID uint64) (int64, error)
 	GroupByDay(ctx context.Context, urlID uint64, days int) ([]domain.DailyCount, error)
 	TopUserAgents(ctx context.Context, urlID uint64, limit int) ([]domain.UserAgentCount, error)
+	DeleteOlderThan(ctx context.Context, days int) (int64, error)
 }
 
 // MySQLClickRepository implements ClickRepository using *sql.DB.
@@ -22,7 +23,7 @@ type MySQLClickRepository struct {
 }
 
 // NewClickRepository returns a new MySQLClickRepository.
-func NewClickRepository(db *sql.DB) ClickRepository {
+func NewClickRepository(db *sql.DB) *MySQLClickRepository {
 	return &MySQLClickRepository{db: db}
 }
 
@@ -114,4 +115,20 @@ func (r *MySQLClickRepository) TopUserAgents(ctx context.Context, urlID uint64, 
 	}
 
 	return results, nil
+}
+
+func (r *MySQLClickRepository) DeleteOlderThan(ctx context.Context, days int) (int64, error) {
+	const q = `DELETE FROM clicks WHERE accessed_at < NOW() - INTERVAL ? DAY LIMIT 10000`
+
+	res, err := r.db.ExecContext(ctx, q, days)
+	if err != nil {
+		return 0, fmt.Errorf("click_repository: delete older than: %w", err)
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("click_repository: delete older than rows affected: %w", err)
+	}
+
+	return n, nil
 }

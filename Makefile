@@ -32,8 +32,10 @@ test-integration:
 	go test ./tests/integration/... -v -tags=integration
 
 coverage:
-	go test ./... -coverprofile=coverage.out
+	go test ./internal/... -coverprofile=coverage.out
+	@go tool cover -func=coverage.out | tail -1
 	go tool cover -html=coverage.out -o coverage.html
+	@echo "HTML report: coverage.html"
 
 migrate-up:
 	go run ./cmd/migrate up

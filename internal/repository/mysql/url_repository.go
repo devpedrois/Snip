@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/devpedrois/snip/internal/domain"
+	"github.com/devpedrois/snip/internal/scanner"
 )
 
 // URLRepository defines the contract for URL persistence.
@@ -14,8 +15,12 @@ type URLRepository interface {
 	Create(ctx context.Context, u *domain.URL) error
 	FindByHash(ctx context.Context, hash string) (*domain.URL, error)
 	FindByID(ctx context.Context, id uint64) (*domain.URL, error)
+	FindByOriginalURL(ctx context.Context, originalURL string) (*domain.URL, error)
+	FindByVTStatus(ctx context.Context, status string) ([]*domain.URL, error)
 	UpdateHash(ctx context.Context, id uint64, hash string) error
 	UpdateLastAccessed(ctx context.Context, id uint64) error
+	UpdateVTStatus(ctx context.Context, id uint64, status string) error
+	UpdateVTResult(ctx context.Context, id uint64, result scanner.ScanResult) error
 }
 
 // MySQLURLRepository implements URLRepository using *sql.DB.
@@ -24,12 +29,12 @@ type MySQLURLRepository struct {
 }
 
 // NewURLRepository returns a new MySQLURLRepository.
-func NewURLRepository(db *sql.DB) URLRepository {
+func NewURLRepository(db *sql.DB) *MySQLURLRepository {
 	return &MySQLURLRepository{db: db}
 }
 
 func (r *MySQLURLRepository) Create(ctx context.Context, u *domain.URL) error {
-	const q = `INSERT INTO urls (hash, original_url, expires_at) VALUES (?, ?, ?)`
+	const q = `INSERT INTO urls (hash, original_url, expires_at, vt_status) VALUES (?, ?, ?, 'pending')`
 
 	res, err := r.db.ExecContext(ctx, q, u.Hash, u.OriginalURL, u.ExpiresAt)
 	if err != nil {
@@ -46,11 +51,14 @@ func (r *MySQLURLRepository) Create(ctx context.Context, u *domain.URL) error {
 }
 
 func (r *MySQLURLRepository) FindByHash(ctx context.Context, hash string) (*domain.URL, error) {
-	const q = `SELECT id, hash, original_url, created_at, last_accessed_at, expires_at FROM urls WHERE hash = ?`
+	const q = `SELECT id, hash, original_url, created_at, last_accessed_at, expires_at,
+	           vt_status, vt_scanned_at, vt_positives, vt_permalink
+	           FROM urls WHERE hash = ?`
 
 	u := &domain.URL{}
 	err := r.db.QueryRowContext(ctx, q, hash).Scan(
 		&u.ID, &u.Hash, &u.OriginalURL, &u.CreatedAt, &u.LastAccessedAt, &u.ExpiresAt,
+		&u.VTStatus, &u.VTScannedAt, &u.VTPositives, &u.VTPermalink,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrURLNotFound
@@ -63,11 +71,14 @@ func (r *MySQLURLRepository) FindByHash(ctx context.Context, hash string) (*doma
 }
 
 func (r *MySQLURLRepository) FindByID(ctx context.Context, id uint64) (*domain.URL, error) {
-	const q = `SELECT id, hash, original_url, created_at, last_accessed_at, expires_at FROM urls WHERE id = ?`
+	const q = `SELECT id, hash, original_url, created_at, last_accessed_at, expires_at,
+	           vt_status, vt_scanned_at, vt_positives, vt_permalink
+	           FROM urls WHERE id = ?`
 
 	u := &domain.URL{}
 	err := r.db.QueryRowContext(ctx, q, id).Scan(
 		&u.ID, &u.Hash, &u.OriginalURL, &u.CreatedAt, &u.LastAccessedAt, &u.ExpiresAt,
+		&u.VTStatus, &u.VTScannedAt, &u.VTPositives, &u.VTPermalink,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrURLNotFound
@@ -77,6 +88,60 @@ func (r *MySQLURLRepository) FindByID(ctx context.Context, id uint64) (*domain.U
 	}
 
 	return u, nil
+}
+
+func (r *MySQLURLRepository) FindByOriginalURL(ctx context.Context, originalURL string) (*domain.URL, error) {
+	const q = `SELECT id, hash, original_url, created_at, last_accessed_at, expires_at,
+	           vt_status, vt_scanned_at, vt_positives, vt_permalink
+	           FROM urls
+	           WHERE original_url = ? AND (expires_at IS NULL OR expires_at > NOW())
+	           LIMIT 1`
+
+	u := &domain.URL{}
+	err := r.db.QueryRowContext(ctx, q, originalURL).Scan(
+		&u.ID, &u.Hash, &u.OriginalURL, &u.CreatedAt, &u.LastAccessedAt, &u.ExpiresAt,
+		&u.VTStatus, &u.VTScannedAt, &u.VTPositives, &u.VTPermalink,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, domain.ErrURLNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("url_repository: find by original url: %w", err)
+	}
+
+	return u, nil
+}
+
+func (r *MySQLURLRepository) FindByVTStatus(ctx context.Context, status string) ([]*domain.URL, error) {
+	const q = `SELECT id, hash, original_url, created_at, last_accessed_at, expires_at,
+	           vt_status, vt_scanned_at, vt_positives, vt_permalink
+	           FROM urls
+	           WHERE vt_status = ? AND (expires_at IS NULL OR expires_at > NOW())
+	           ORDER BY created_at ASC
+	           LIMIT 100`
+
+	rows, err := r.db.QueryContext(ctx, q, status)
+	if err != nil {
+		return nil, fmt.Errorf("url_repository: find by vt status: %w", err)
+	}
+	defer rows.Close()
+
+	var urls []*domain.URL
+	for rows.Next() {
+		u := &domain.URL{}
+		if err := rows.Scan(
+			&u.ID, &u.Hash, &u.OriginalURL, &u.CreatedAt, &u.LastAccessedAt, &u.ExpiresAt,
+			&u.VTStatus, &u.VTScannedAt, &u.VTPositives, &u.VTPermalink,
+		); err != nil {
+			return nil, fmt.Errorf("url_repository: find by vt status scan: %w", err)
+		}
+		urls = append(urls, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("url_repository: find by vt status rows: %w", err)
+	}
+
+	return urls, nil
 }
 
 func (r *MySQLURLRepository) UpdateHash(ctx context.Context, id uint64, hash string) error {
@@ -96,6 +161,34 @@ func (r *MySQLURLRepository) UpdateLastAccessed(ctx context.Context, id uint64) 
 	_, err := r.db.ExecContext(ctx, q, id)
 	if err != nil {
 		return fmt.Errorf("url_repository: update last accessed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *MySQLURLRepository) UpdateVTStatus(ctx context.Context, id uint64, status string) error {
+	const q = `UPDATE urls SET vt_status = ? WHERE id = ?`
+
+	_, err := r.db.ExecContext(ctx, q, status, id)
+	if err != nil {
+		return fmt.Errorf("url_repository: update vt status: %w", err)
+	}
+
+	return nil
+}
+
+func (r *MySQLURLRepository) UpdateVTResult(ctx context.Context, id uint64, result scanner.ScanResult) error {
+	const q = `UPDATE urls SET vt_status = ?, vt_scanned_at = ?, vt_positives = ?, vt_permalink = ? WHERE id = ?`
+
+	_, err := r.db.ExecContext(ctx, q,
+		string(result.Status),
+		result.ScannedAt,
+		result.Positives,
+		result.Permalink,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("url_repository: update vt result: %w", err)
 	}
 
 	return nil

@@ -283,3 +283,63 @@ func TestClickRepository_TopUserAgents(t *testing.T) {
 		})
 	}
 }
+
+func TestClickRepository_DeleteOlderThan(t *testing.T) {
+	const deleteQuery = `DELETE FROM clicks WHERE accessed_at < NOW() - INTERVAL ? DAY LIMIT 10000`
+
+	tests := []struct {
+		name        string
+		days        int
+		setup       func(mock sqlmock.Sqlmock)
+		wantDeleted int64
+		wantErr     bool
+	}{
+		{
+			name: "deletes old clicks",
+			days: 90,
+			setup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec(deleteQuery).
+					WithArgs(90).
+					WillReturnResult(sqlmock.NewResult(0, 42))
+			},
+			wantDeleted: 42,
+		},
+		{
+			name: "no rows to delete",
+			days: 90,
+			setup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec(deleteQuery).
+					WithArgs(90).
+					WillReturnResult(sqlmock.NewResult(0, 0))
+			},
+			wantDeleted: 0,
+		},
+		{
+			name: "sql error",
+			days: 90,
+			setup: func(mock sqlmock.Sqlmock) {
+				mock.ExpectExec(deleteQuery).
+					WithArgs(90).
+					WillReturnError(errors.New("db error"))
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, mock := newClickRepo(t)
+			tt.setup(mock)
+
+			deleted, err := repo.DeleteOlderThan(context.Background(), tt.days)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantDeleted, deleted)
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
